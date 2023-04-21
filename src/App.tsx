@@ -206,10 +206,6 @@ const productsCollection = buildCollection<Product>({
         dataType: "string",
         enumValues: {
           electronics: "Electronics",
-          books: "Books",
-          furniture: "Furniture",
-          clothing: "Clothing",
-          food: "Food",
           giftcards: "Gift Cards"
         }
       }
@@ -236,12 +232,12 @@ const usersCollection = buildCollection<User>({
     },
     firstName: {
       name: "First Name",
-      validation: { required: true },
+      validation: { required: false },
       dataType: "string"
     },
     lastName: {
       name: "Last Name",
-      validation: { required: true },
+      validation: { required: false },
       dataType: "string"
     },
     createdAt: {
