@@ -1,12 +1,13 @@
 import React, { useCallback } from "react";
 
 import { User as FirebaseUser } from "firebase/auth";
+
 import {
   Authenticator,
   buildCollection,
   buildProperty,
   EntityReference,
-  FirebaseCMSApp
+  FirebaseCMSApp,
 } from "firecms";
 
 import "typeface-rubik";
@@ -31,6 +32,9 @@ const locales = {
   "de-DE": "German"
 };
 
+
+
+
 type Product = {
   name: string;
   retailPrice: number;
@@ -47,9 +51,17 @@ type Product = {
 
 type User = {
   displayName: string;
+  firstName: string;
+  lastName: string;
   createdAt: Date;
   email: string;
   role: string;
+}
+
+type Page = {
+  page_slug: string;
+  page_title: string;
+  page_body: string;
 }
 
 const localeCollection = buildCollection({
@@ -157,6 +169,7 @@ const productsCollection = buildCollection<Product>({
     main_image: buildProperty({ // The `buildProperty` method is a utility function used for type checking
       name: "Image",
       dataType: "string",
+      storeUrl: "string",
       storage: {
         storagePath: "images",
         acceptedFiles: ["image/*"]
@@ -221,6 +234,16 @@ const usersCollection = buildCollection<User>({
       validation: { required: true },
       dataType: "string"
     },
+    firstName: {
+      name: "First Name",
+      validation: { required: true },
+      dataType: "string"
+    },
+    lastName: {
+      name: "Last Name",
+      validation: { required: true },
+      dataType: "string"
+    },
     createdAt: {
       name: "Created At",
       validation: { required: true },
@@ -240,6 +263,38 @@ const usersCollection = buildCollection<User>({
 
 });
 
+const pagesCollection = buildCollection<Page>({
+  name: "Pages",
+  singularName: "Page",
+  path: "pages",
+  permissions: ({ authController }) => ({
+    edit: true,
+    create: true,
+    delete: true
+  }),
+
+  properties: {
+    page_slug: {
+      name: "Slug",
+      validation: { required: true },
+      dataType: "string"
+    },
+    page_title: {
+      name: "Title",
+      validation: { required: true },
+      dataType: "string"
+    },
+    page_body: {
+      name: "Body",
+      validation: { required: true },
+      dataType: "string",
+      markdown: true,
+    },
+  }
+
+});
+
+
 
 export default function App() {
 
@@ -249,12 +304,13 @@ export default function App() {
   }) => {
 
     if (user?.email?.includes("flanders")) {
-      throw Error("Stupid Flanders!");
+      throw Error("Access Denied");
     }
 
     console.log("Allowing access to", user?.email);
     // This is an example of retrieving async data related to the user
     // and storing it in the user extra field.
+
     const sampleUserRoles = await Promise.resolve(["admin"]);
     authController.setExtra(sampleUserRoles);
 
@@ -264,7 +320,7 @@ export default function App() {
   return <FirebaseCMSApp
     name={"Grabbit"}
     authentication={myAuthenticator}
-    collections={[productsCollection, usersCollection]}
+    collections={[productsCollection, usersCollection, pagesCollection]}
     firebaseConfig={firebaseConfig}
   />;
 }
