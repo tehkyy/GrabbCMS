@@ -33,8 +33,6 @@ const locales = {
 };
 
 
-
-
 type Product = {
   name: string;
   retailPrice: number;
