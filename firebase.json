@@ -1,6 +1,6 @@
 {
   "hosting": {
-      "site": "grabbit-370315",
+      "site": "grabbit-dev-b598a",
       "public": "dist",
       "ignore": [
           "firebase.json",

@@ -13,17 +13,16 @@ import {
 import "typeface-rubik";
 import "@fontsource/ibm-plex-mono";
 
+
 // Your web app's Firebase configuration
 // For Firebase JS SDK v7.20.0 and later, measurementId is optional
 const firebaseConfig = {
-  apiKey: "AIzaSyB7WREdD0qbva7z_IczthA_mFwlYyFfzCE",
-  authDomain: "grabbit-370315.firebaseapp.com",
-  databaseURL: "https://grabbit-370315-default-rtdb.firebaseio.com",
-  projectId: "grabbit-370315",
-  storageBucket: "grabbit-370315.appspot.com",
-  messagingSenderId: "752720519034",
-  appId: "1:752720519034:web:a75de670a0f1fa4945c0c3",
-  measurementId: "G-4NE9Q3C3BQ"
+  apiKey: import.meta.env.VITE_API_KEY,
+  authDomain: import.meta.env.VITE_AUTH_DOMAIN,
+  databaseURL: import.meta.env.VITE_RTDB,
+  projectId: import.meta.env.VITE__PROJECT_ID,
+  storageBucket: import.meta.env.VITE_STORAGE_BUCKET,
+  appId: import.meta.env.VITE_APP_ID,
 };
 
 const locales = {
@@ -45,6 +44,10 @@ type Product = {
   descriptionHeading: string;
   description: string;
   categories: string[],
+}
+
+type ProductQueue = {
+  product: EntityReference;
 }
 
 type User = {
@@ -211,6 +214,27 @@ const productsCollection = buildCollection<Product>({
   }
 });
 
+const queueCollection = buildCollection<ProductQueue>({
+  name: "Queue Products",
+  singularName: "Queued Product",
+  path: "grabb_q",
+  permissions: ({ authController }) => ({
+    edit: true,
+    create: true,
+    // we have created the roles object in the navigation builder
+    delete: true
+  }),
+
+  properties: {
+    product: {
+      dataType: "reference",
+      name: "Product Queue",
+      description: "Reference to self",
+      path: "products"
+    },
+  }
+});
+
 const usersCollection = buildCollection<User>({
   name: "Users",
   singularName: "User",
@@ -310,11 +334,11 @@ export default function App() {
 
     return true;
   }, []);
-
+  
   return <FirebaseCMSApp
     name={"Grabbit"}
     authentication={myAuthenticator}
-    collections={[productsCollection, usersCollection, pagesCollection]}
+    collections={[productsCollection, usersCollection, pagesCollection, queueCollection]}
     firebaseConfig={firebaseConfig}
   />;
 }
