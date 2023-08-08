@@ -12,18 +12,33 @@ import {
 
 import "typeface-rubik";
 import "@fontsource/ibm-plex-mono";
+import { Preview } from "@mui/icons-material";
 
+import { CustomPricePreview } from "./previews/price";
 
-// Your web app's Firebase configuration
-// For Firebase JS SDK v7.20.0 and later, measurementId is optional
+// Production Config
 const firebaseConfig = {
-  apiKey: import.meta.env.VITE_API_KEY,
-  authDomain: import.meta.env.VITE_AUTH_DOMAIN,
-  databaseURL: import.meta.env.VITE_RTDB,
-  projectId: import.meta.env.VITE__PROJECT_ID,
-  storageBucket: import.meta.env.VITE_STORAGE_BUCKET,
-  appId: import.meta.env.VITE_APP_ID,
+  apiKey: "AIzaSyB7WREdD0qbva7z_IczthA_mFwlYyFfzCE",
+  authDomain: "grabbit-370315.firebaseapp.com",
+  databaseURL: "https://grabbit-370315-default-rtdb.firebaseio.com",
+  projectId: "grabbit-370315",
+  storageBucket: "grabbit-370315.appspot.com",
+  messagingSenderId: "752720519034",
+  appId: "1:752720519034:web:a75de670a0f1fa4945c0c3",
+  measurementId: "G-4NE9Q3C3BQ"
 };
+
+//Dev config
+// const firebaseConfig = {
+//   apiKey: "AIzaSyDC6b8-KRk-OvnsL9Uk-xVIrrUkFNlz6cA",
+//   authDomain: "grabbit-dev-b598a.firebaseapp.com",
+//   databaseURL: "https://grabbit-dev-b598a-default-rtdb.firebaseio.com",
+//   projectId: "grabbit-dev-b598a",
+//   storageBucket: "grabbit-dev-b598a.appspot.com",
+//   messagingSenderId: "16188557936",
+//   appId: "1:16188557936:web:5eafafa096a59e411ac2b5"
+// };
+
 
 const locales = {
   "en-US": "English (United States)",
@@ -31,19 +46,20 @@ const locales = {
   "de-DE": "German"
 };
 
-
 type Product = {
   name: string;
   retailPrice: number;
+  floorPrice: number;
   quantity: number;
-  status: string;
-  published: boolean;
   related_products: EntityReference[];
   main_image: string;
+  cart_image: string;
   tags: string[];
   descriptionHeading: string;
   description: string;
   categories: string[],
+  specs: string;
+  launch_time: Date;
 }
 
 type ProductQueue = {
@@ -112,8 +128,8 @@ const productsCollection = buildCollection<Product>({
       validation: { required: true },
       dataType: "string"
     },
-    retailPrice: {
-      name: "Price",
+    retailPrice: buildProperty({
+      name: "Retail Price",
       validation: {
         required: true,
         requiredMessage: "You must set a price in cents between 0 and 100000",
@@ -121,8 +137,21 @@ const productsCollection = buildCollection<Product>({
         max: 100000
       },
       description: "Price with range validation",
-      dataType: "number"
-    },
+      dataType: "number",
+      Preview: CustomPricePreview,
+    }),
+    floorPrice: buildProperty({
+      name: "Floor Price",
+      validation: {
+        required: true,
+        requiredMessage: "You must set a price in cents between 0 and 100000",
+        min: 0,
+        max: 100000
+      },
+      description: "Price with range validation",
+      dataType: "number",
+      Preview: CustomPricePreview,
+    }),
     quantity: {
       name: "Quantity",
       validation: {
@@ -132,43 +161,15 @@ const productsCollection = buildCollection<Product>({
         max: 100000
       },
       description: "Price with range validation",
-      dataType: "number"
+      dataType: "number",
     },
-    status: {
-      name: "Status",
-      validation: { required: true },
-      dataType: "string",
-      description: "Should this product be visible in the website",
-      longDescription: "Example of a long description hidden under a tooltip. Lorem ipsum dolor sit amet, consectetur adipiscing elit. Proin quis bibendum turpis. Sed scelerisque ligula nec nisi pellentesque, eget viverra lorem facilisis. Praesent a lectus ac ipsum tincidunt posuere vitae non risus. In eu feugiat massa. Sed eu est non velit facilisis facilisis vitae eget ante. Nunc ut malesuada erat. Nullam sagittis bibendum porta. Maecenas vitae interdum sapien, ut aliquet risus. Donec aliquet, turpis finibus aliquet bibendum, tellus dui porttitor quam, quis pellentesque tellus libero non urna. Vestibulum maximus pharetra congue. Suspendisse aliquam congue quam, sed bibendum turpis. Aliquam eu enim ligula. Nam vel magna ut urna cursus sagittis. Suspendisse a nisi ac justo ornare tempor vel eu eros.",
-      enumValues: {
-        private: "Private",
-        public: "Public"
-      }
-    },
-    published: ({ values }) => buildProperty({
-      name: "Published",
-      dataType: "boolean",
-      columnWidth: 100,
-      disabled: (
-        values.status === "public"
-          ? false
-          : {
-            clearOnDisabled: true,
-            disabledMessage: "Status must be public in order to enable this the published flag"
-          }
-      )
+    launch_time: buildProperty({
+      name: "Launch Time",
+      dataType: 'date',
+      description: "When will this item be live on site?",
     }),
-    related_products: {
-      dataType: "array",
-      name: "Related products",
-      description: "Reference to self",
-      of: {
-        dataType: "reference",
-        path: "products"
-      }
-    },
-    main_image: buildProperty({ // The `buildProperty` method is a utility function used for type checking
-      name: "Image",
+    main_image: buildProperty({
+      name: "Main Image",
       dataType: "string",
       storeUrl: "string",
       storage: {
@@ -176,6 +177,38 @@ const productsCollection = buildCollection<Product>({
         acceptedFiles: ["image/*"]
       }
     }),
+    cart_image: buildProperty({
+      name: "Cart Image",
+      dataType: "string",
+      storeUrl: "string",
+      storage: {
+        storagePath: "images",
+        acceptedFiles: ["image/*"]
+      }
+    }),
+    descriptionHeading: {
+      name: "Description Heading",
+      description: "Not mandatory but it'd be awesome if you filled this up",
+      longDescription: "",
+      dataType: "string",
+      columnWidth: 300,
+    },
+    description: {
+      name: "Description",
+      description: "What is this thing?",
+      longDescription: "",
+      dataType: "string",
+      columnWidth: 300,
+      multiline: true,
+    },
+    specs:{
+      name: "Specifications",
+      validation: { required: false },
+      dataType: "string",
+      description: "What are all the deets for it?",
+      columnWidth: 300,
+      markdown: true,
+    },
     tags: {
       name: "Tags",
       description: "Example of generic array",
@@ -184,20 +217,6 @@ const productsCollection = buildCollection<Product>({
       of: {
         dataType: "string"
       }
-    },
-    descriptionHeading: {
-      name: "Description Heading",
-      description: "Not mandatory but it'd be awesome if you filled this up",
-      longDescription: "Example of a long description hidden under a tooltip. Lorem ipsum dolor sit amet, consectetur adipiscing elit. Proin quis bibendum turpis. Sed scelerisque ligula nec nisi pellentesque, eget viverra lorem facilisis. Praesent a lectus ac ipsum tincidunt posuere vitae non risus. In eu feugiat massa. Sed eu est non velit facilisis facilisis vitae eget ante. Nunc ut malesuada erat. Nullam sagittis bibendum porta. Maecenas vitae interdum sapien, ut aliquet risus. Donec aliquet, turpis finibus aliquet bibendum, tellus dui porttitor quam, quis pellentesque tellus libero non urna. Vestibulum maximus pharetra congue. Suspendisse aliquam congue quam, sed bibendum turpis. Aliquam eu enim ligula. Nam vel magna ut urna cursus sagittis. Suspendisse a nisi ac justo ornare tempor vel eu eros.",
-      dataType: "string",
-      columnWidth: 300
-    },
-    description: {
-      name: "Description",
-      description: "What is this thing?",
-      longDescription: "Example of a long description hidden under a tooltip. Lorem ipsum dolor sit amet, consectetur adipiscing elit. Proin quis bibendum turpis. Sed scelerisque ligula nec nisi pellentesque, eget viverra lorem facilisis. Praesent a lectus ac ipsum tincidunt posuere vitae non risus. In eu feugiat massa. Sed eu est non velit facilisis facilisis vitae eget ante. Nunc ut malesuada erat. Nullam sagittis bibendum porta. Maecenas vitae interdum sapien, ut aliquet risus. Donec aliquet, turpis finibus aliquet bibendum, tellus dui porttitor quam, quis pellentesque tellus libero non urna. Vestibulum maximus pharetra congue. Suspendisse aliquam congue quam, sed bibendum turpis. Aliquam eu enim ligula. Nam vel magna ut urna cursus sagittis. Suspendisse a nisi ac justo ornare tempor vel eu eros.",
-      dataType: "string",
-      columnWidth: 300
     },
     categories: {
       name: "Categories",
@@ -209,6 +228,15 @@ const productsCollection = buildCollection<Product>({
           electronics: "Electronics",
           giftcards: "Gift Cards"
         }
+      }
+    },
+    related_products: {
+      dataType: "array",
+      name: "Related products",
+      description: "Reference to self",
+      of: {
+        dataType: "reference",
+        path: "products"
       }
     },
   }
@@ -326,6 +354,7 @@ export default function App() {
     }
 
     console.log("Allowing access to", user?.email);
+
     // This is an example of retrieving async data related to the user
     // and storing it in the user extra field.
 
@@ -334,6 +363,8 @@ export default function App() {
 
     return true;
   }, []);
+
+  
   
   return <FirebaseCMSApp
     name={"Grabbit"}
