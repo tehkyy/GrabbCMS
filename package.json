@@ -1,5 +1,5 @@
 {
-  "name": "grabbserver",
+  "name": "grabbcms",
   "private": true,
   "version": "0.0.0",
   "type": "module",
@@ -16,6 +16,8 @@
     "@mui/lab": "^5.0.0-alpha.126",
     "@mui/material": "^5",
     "@mui/x-date-pickers": "^5.0.0-beta.1",
+    "@types/node": "^20.7.1",
+    "dotenv": "^16.3.1",
     "firebase": "^9",
     "firecms": "^2.0.0-beta.5-pre.1",
     "react": "^18.2.0",

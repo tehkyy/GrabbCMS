@@ -941,9 +941,9 @@
   integrity sha512-Dq5rYfEpdeel0bLVN+nfD1VWmzCkK+pJbSjIawGE+RY4+NIJqhbUDDQjvV0NUK84fMfwxvtFoCtEe70HfZjFcw==
 
 "@firecms/data_enhancement@^0.6.3":
-  version "1.1.2"
-  resolved "https://registry.yarnpkg.com/@firecms/data_enhancement/-/data_enhancement-1.1.2.tgz#936b8e9bf01f7f99574c3e4ff34a0f75d223a1c0"
-  integrity sha512-mG1XHT2u3lttBjJVeoEPdo2KKigAbOkKva7OwH8g0m2XXTiXx226YVXPPa7xspoNFwhMl6rJxI9vr6kpML9Apg==
+  version "1.1.3"
+  resolved "https://registry.yarnpkg.com/@firecms/data_enhancement/-/data_enhancement-1.1.3.tgz#034876c722a91389ead4b6c963bf306dae9a24eb"
+  integrity sha512-/SQdaf8ieUhRchk1uE/dxF5aGD+ett0buHz4VngFnN7AdkS5iQlvvoRu7DyuGrpPiGsqfIupxa/dW2Sj3sy0bg==
   dependencies:
     "@emotion/react" "^11.11.1"
     "@emotion/styled" "^11.11.0"
@@ -1254,6 +1254,11 @@
   version "20.4.2"
   resolved "https://registry.yarnpkg.com/@types/node/-/node-20.4.2.tgz#129cc9ae69f93824f92fac653eebfb4812ab4af9"
   integrity sha512-Dd0BYtWgnWJKwO1jkmTrzofjK2QXXcai0dmtzvIBhcA+RsG5h8R3xlyta0kGOZRNfL9GuRtb1knmPEhQrePCEw==
+
+"@types/node@^20.7.1":
+  version "20.7.1"
+  resolved "https://registry.yarnpkg.com/@types/node/-/node-20.7.1.tgz#06d732ead0bd5ad978ef0ea9cbdeb24dc8717514"
+  integrity sha512-LT+OIXpp2kj4E2S/p91BMe+VgGX2+lfO+XTpfXhh+bCk2LkQtHZSub8ewFBMGP5ClysPjTDFa4sMI8Q3n4T0wg==
 
 "@types/parse-json@^4.0.0":
   version "4.0.0"
@@ -2440,11 +2445,6 @@ yargs@^17.7.2:
     string-width "^4.2.3"
     y18n "^5.0.5"
     yargs-parser "^21.1.1"
-
-yarn@^1.22.19:
-  version "1.22.19"
-  resolved "https://registry.yarnpkg.com/yarn/-/yarn-1.22.19.tgz#4ba7fc5c6e704fce2066ecbfb0b0d8976fe62447"
-  integrity sha512-/0V5q0WbslqnwP91tirOvldvYISzaqhClxzyUKXYxs07yUILIs5jx/k6CFe8bvKSkds5w+eiOqta39Wk3WxdcQ==
 
 yup@^0.32.11:
   version "0.32.11"

@@ -322,7 +322,11 @@ export const productsCollection = buildCollection<Product>({
     }
     
   },
+<<<<<<< HEAD
   Actions: [AdminActions] 
+=======
+  Actions: [ProductActions, AdminActions] 
+>>>>>>> 055890a (many updates…)
 
 });
 

@@ -106,7 +106,10 @@ export default function AdminActions(props: AdminActionsProps) {
             <Button variant="contained" color={selectedEntities.length > 0 ? "secondary" : "inherit"} onClick={selectAllEntities}>
                 {selectedEntities.length < 1 ? 'Select All' : 'Deselect All' }
             </Button>
+<<<<<<< HEAD
             <Button onClick={(() => console.log(import.meta.env.VITE_PRODUCTION_API_KEY))}>Log ENV</Button>
+=======
+>>>>>>> 055890a (many updates…)
             <Snackbar open={openSnackbar} autoHideDuration={6000} onClose={handleCloseSnackbar}>
                 <Alert onClose={handleCloseSnackbar} severity="success">
                     Date Added!
