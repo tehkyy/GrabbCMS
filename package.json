@@ -1,7 +1,7 @@
 {
   "name": "grabbcms",
   "private": true,
-  "version": "1.5.1",
+  "version": "1.5.2",
   "type": "module",
   "scripts": {
     "dev": "vite --mode development",
@@ -9,7 +9,7 @@
     "prd": "vite --mode production",
     "build": "tsc && vite build",
     "preview": "vite preview",
-    "deploy": "yarn version --patch && build && firebase deploy --only hosting"
+    "deploy": "yarn version --patch && yarn run build && firebase deploy --only hosting"
   },
   "dependencies": {
     "@emotion/react": "^11.11.4",
