@@ -1,7 +1,7 @@
 {
   "name": "grabbcms",
   "private": true,
-  "version": "1.5.11",
+  "version": "1.5.12",
   "type": "module",
   "scripts": {
     "dev": "vite --mode development",
@@ -9,8 +9,10 @@
     "prd": "vite --mode production",
     "build": "tsc && vite build",
     "preview": "vite preview",
-    "deploy": "firebase use grabbit-370315 && yarn version --patch && yarn run build --mode production && firebase deploy --only hosting",
-    "deploy-dev": "firebase use grabbit-dev-b598a && yarn version --patch && tsc && vite build --mode development && firebase deploy --only hosting"
+    "update-firebase-config:dev": "node updateFirebaseConfig.js development",
+    "update-firebase-config:prod": "node updateFirebaseConfig.js production",
+    "deploy:prod": "firebase use grabbit-370315 && yarn update-firebase-config:prod && yarn version --patch && yarn run build --mode production && firebase deploy --only hosting",
+    "deploy:dev": "firebase use grabbit-dev-b598a && yarn update-firebase-config:dev && yarn version --patch && tsc && vite build --mode development && firebase deploy --only hosting"
   },
   "dependencies": {
     "@emotion/react": "^11.11.4",
@@ -24,9 +26,11 @@
     "@types/node": "^20.7.1",
     "axios": "^1.7.2",
     "date-fns": "2.21.1",
-    "dotenv": "^16.3.1",
+    "dotenv": "^16.4.5",
     "firebase": "^9",
     "firecms": "^2.2.1",
+    "jsonfile": "^6.1.0",
+    "path": "^0.12.7",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "react-router": "^6",
