@@ -10,7 +10,6 @@ type ProductActionsProps = CollectionActionsProps;
 export default function ProductActions(props: ProductActionsProps) {
   const { selectionController } = props;
   const [openSnackbar, setOpenSnackbar] = useState(false);
-  const [showArchived, setShowArchived] = useState(false);
   const selectedEntities = selectionController.selectedEntities;
 
   const Alert = React.forwardRef<HTMLDivElement, AlertProps>((props, ref) => {

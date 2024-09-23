@@ -11,7 +11,6 @@ type AdminActionsProps = CollectionActionsProps;
 export default function AdminActions(props: AdminActionsProps) {
     const { selectionController } = props; // Destructure entityCollection from props
     const [openSnackbar, setOpenSnackbar] = useState(false);
-    const [showArchived, setShowArchived] = useState(false);
     const selectedEntities = selectionController.selectedEntities;
 
     const entityCollection = props.collection;
@@ -39,12 +38,12 @@ export default function AdminActions(props: AdminActionsProps) {
                     collectionName = entity.path.split('/')[0]
                 } 
             
-                const prodDocRef = doc(firestoreDataBase, collectionName, docId);
-                const prodDocSnap = await getDoc(prodDocRef);
+                const docRef = doc(firestoreDataBase, collectionName, docId);
+                const docSnap = await getDoc(docRef);
             
-                if (prodDocSnap.exists()) {
+                if (docSnap.exists()) {
                     // Update the document to set the 'createdAt' field to the current date and time
-                    await updateDoc(prodDocRef, {
+                    await updateDoc(docRef, {
                         createdAt: new Date()
                     });
                     console.log(`Updated ${docId} in ${collectionName} with current date and time.`);
@@ -73,7 +72,7 @@ export default function AdminActions(props: AdminActionsProps) {
           console.error("Entity collection context is not available.");
           return;
         }
-
+    
         //If there is a selection already, this will deselect instead
         if(selectedEntities.length > 0){
             selectionController.setSelectedEntities([]);
@@ -84,18 +83,20 @@ export default function AdminActions(props: AdminActionsProps) {
         const querySnapshot = await getDocs(collection(firestoreDataBase, collectionName));
         const entities = querySnapshot.docs.map(doc => ({
           id: doc.id,
-          path: `${collectionName}/${doc.id}` // Assuming the path format you're using elsewhere
+          path: `${collectionName}/${doc.id}`, // Assuming the path format you're using elsewhere
+          values: doc.data() // Assuming 'values' should hold the document data
         }));
     
         selectionController.setSelectedEntities(entities);
         console.log(`Selected all entities from collection: ${collectionName}`);
-      };
+    };
     const handleCloseSnackbar = (event?: React.SyntheticEvent | Event, reason?: string) => {
         if (reason === 'clickaway') {
             return;
         }
         setOpenSnackbar(false);
     };
+    
 
 
     return (

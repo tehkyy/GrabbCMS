@@ -1,5 +1,4 @@
 import {
-    EntityReference,
       buildCollection,
       buildProperty,
     } from "firecms";
@@ -9,6 +8,7 @@ import AdminActions from "../actions/admin.actions";
   
   
   type Release = {
+      createdAt: Date;
       publication_date: Date;
       updated: Date,
       page_slug: string;
@@ -24,7 +24,7 @@ import AdminActions from "../actions/admin.actions";
       icon: 'Newspaper',
       singularName: "Press Release",
       path: "press",
-      group:'Page',
+      group:'Content',
       permissions: ({ authController }) => ({
         edit: true,
         create: true,
@@ -50,8 +50,16 @@ import AdminActions from "../actions/admin.actions";
         publication_date: buildProperty({
             dataType: "date",
             name: "Publication Date",
-            autoValue: "on_create"
+            autoValue: "on_create",
+            hideFromCollection: true
+
         }),
+        createdAt: buildProperty({
+          dataType: "date",
+          name: "Created Date",
+          autoValue: "on_create",
+          hideFromCollection: true
+      }),
         page_title: {
           name: "Title",
           validation: { required: true },
@@ -76,6 +84,6 @@ import AdminActions from "../actions/admin.actions";
           },
       },
 
-      Actions: [AdminActions] 
+      
 
     });

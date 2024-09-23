@@ -18,7 +18,7 @@
   },
   "include": [
     "src",
-    "./process-env.d.ts"
-],
-  "references": [{ "path": "./tsconfig.node.json" }]
+    "./process-env.d.ts",
+    "vite.config.ts"
+]
 }

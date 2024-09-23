@@ -1,15 +1,9 @@
 import {
     buildCollection,
-    EntityReference,
   } from "firecms";
-import AdminActions from "../actions/admin.actions";
 
-type ProductQueue = {
-    product: EntityReference;
-    createdAt: Date;
-  }
   
-  export const queueCollection = buildCollection<ProductQueue>({
+  export const queueCollection = buildCollection({
     name: "Queue Products",
     group:'Product',
     icon: 'Queue',
@@ -25,16 +19,20 @@ type ProductQueue = {
       createdAt:{
         name: 'Created',
         dataType: 'date',
-        autoValue: "on_create"
+        autoValue: "on_create",
+        hideFromCollection: true,
+        readOnly: true,
       },
       product: {
         dataType: "reference",
         name: "Product Queue",
         description: "Reference to self",
-        path: "products"
+        path: "products",
+        previewProperties: ["main_image", "name"]
+
       },
     },
-    Actions: [AdminActions] 
+    
 
   });
   

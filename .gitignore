@@ -11,6 +11,7 @@ node_modules
 dist
 dist-ssr
 *.local
+.env.*
 .env
 
 # Editor directories and files
@@ -23,3 +24,6 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Firebase config
+firebase-config.ts

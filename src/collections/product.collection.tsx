@@ -1,18 +1,12 @@
 import {
   buildCollection,
   buildProperty,
-  EntityReference,
-  buildProperties,
-  EntityCollection
 } from "firecms";
 
-import "typeface-rubik";
-import "@fontsource/ibm-plex-mono";
-import { CustomPricePreview } from "../previews/price";
-import { imageSchema } from "./image.schema";
+import { getStorage, ref, getDownloadURL } from "firebase/storage";
 
-import ProductActions from "../actions/product.actions";
-import AdminActions from "../actions/admin.actions";
+import { Product } from "../types/product.type";
+import { shippingOptionsCollection } from "./shipping-options.collection";
 
 const CATEGORIES = {
   electronics: "Electronics",
@@ -23,7 +17,6 @@ const CATEGORIES = {
   gaming: "Gaming",
   toys: "Toys"
 }
-
 
 const TAX_CODES = {
   txcd_99999999: "General - Tangible Goods",
@@ -39,45 +32,15 @@ const TAX_CODES = {
   txcd_10502000: "Gift Card",
 }
 
-interface CheckoutFields {
-  key?: string;
-  label?: string;
-  type?: string;
-  options?: Object[];
-}
-
-
-type Product = {
-  name: string;
-  retailPrice: number;
-  floorPrice: number;
-  buyItNowPrice: number;
-  shippingCost: number;
-  taxCode: string;
-  quantity: number;
-  related_products: EntityReference[];
-  main_image: string;
-  cart_image: string;
-  more_images: string[];
-  tags: string[];
-  descriptionHeading: string;
-  description: string;
-  categories: string[],
-  specs: string;
-  launch_time: Date;
-  checkout_fields: CheckoutFields;
-  archived: boolean;
-  createdAt: Date;
-}
-
 export const productsCollection = buildCollection<Product>({
   initialFilter: { archived: ["==", false] },
   name: "Products",
   icon: 'ShoppingCart',
-  group: 'Product',
+  group: 'Commerce',
   singularName: "Product",
   path: "products",
-  inlineEditing: false,
+  inlineEditing: true,
+  textSearchEnabled: true,
   permissions: ({ authController }) => ({
     edit: true,
     create: true,
@@ -92,7 +55,8 @@ export const productsCollection = buildCollection<Product>({
     archived: {
       name: "Archive",
       validation: { required: false },
-      dataType: "boolean"
+      dataType: "boolean",
+      defaultValue: false,
     }, 
     name: {
       name: "Name",
@@ -116,6 +80,10 @@ export const productsCollection = buildCollection<Product>({
       dataType: "string",
       columnWidth: 300,
       multiline: true,
+      validation: {
+        required: true,
+        requiredMessage: "You must set a description",
+      },
     },
     specs: {
       name: "Specifications",
@@ -135,7 +103,6 @@ export const productsCollection = buildCollection<Product>({
       },
       description: "Price with range validation",
       dataType: "number",
-      Preview: CustomPricePreview,
     }),
     buyItNowPrice: buildProperty({
       name: "Buy It Now Price",
@@ -146,7 +113,6 @@ export const productsCollection = buildCollection<Product>({
       },
       description: "But it now price",
       dataType: "number",
-      Preview: CustomPricePreview,
     }),
     floorPrice: buildProperty({
       name: "Floor Price",
@@ -158,7 +124,6 @@ export const productsCollection = buildCollection<Product>({
       },
       description: "Price with range validation",
       dataType: "number",
-      Preview: CustomPricePreview,
     }),
     shippingCost: {
       name: "Shipping Cost",
@@ -180,6 +145,7 @@ export const productsCollection = buildCollection<Product>({
       description: "Tax code for calculating appropriate taxes to collect",
       dataType: "string",
       enumValues: TAX_CODES,
+      defaultValue: 'txcd_99999999'
     }),
     quantity: {
       name: "Quantity",
@@ -200,6 +166,7 @@ export const productsCollection = buildCollection<Product>({
         required: true,
         requiredMessage: "All products must have a launch time.",
       },
+      defaultValue: new Date()
     }),
     main_image: buildProperty({
       name: "Main Image",
@@ -219,6 +186,15 @@ export const productsCollection = buildCollection<Product>({
         }
       },
     }),
+
+    main_image_url: buildProperty({
+      name: "Main Image URL",
+      dataType: "string",
+      readOnly: true, // Mark this field as read-only
+      description: "Automatically generated download URL for the main image",
+      hideFromCollection: true
+    }),
+
     cart_image: buildProperty({
       name: "Cart Image",
       dataType: "string",
@@ -242,15 +218,6 @@ export const productsCollection = buildCollection<Product>({
         }
       },
     }),
-    tags: {
-      name: "Tags",
-      description: "Example of generic array",
-      validation: { required: true },
-      dataType: "array",
-      of: {
-        dataType: "string"
-      }
-    },
     categories: {
       name: "Categories",
       validation: { required: true },
@@ -259,70 +226,30 @@ export const productsCollection = buildCollection<Product>({
         dataType: "string",
         enumValues: CATEGORIES,
       }
-    },
-    related_products: {
-      dataType: "array",
-      name: "Related products",
-      description: "Reference to self",
-      of: {
-        dataType: "reference",
-        path: "products"
-      }
-    },
-    checkout_fields: ({ values }) => {
-      const checkoutFields: CheckoutFields = values.checkout_fields || {};
-      const properties = buildProperties<any>({
-        label: {
-          name: "Label",
-          dataType: "string",
-        },
-        key: {
-          name: "Key",
-          dataType: "string"
-        },
-        type: {
-          name: "Type",
-          dataType: "string",
-          enumValues: {
-            text: "Text",
-            number: "Numeric",
-            dropdown: "Dropdown"
-          },
-        },
-      });
-    
-      if (values.checkout_fields) {
-        if (values.checkout_fields.type === "dropdown") {
-          properties["options"] = buildProperty({
-            name: "Custom Dropdown Options",
-            dataType: "array",
-            of: {
-              dataType: "map",
-              name: "Option",
-              properties: {
-                label: {
-                  name: "Label",
-                  dataType: "string",
-                },
-                value: {
-                  name: "Value",
-                  dataType: "string",
-                }
-              },
-            },
-          });
+    },  
+    stripe_id: {
+      dataType: "string",
+      name: "Stripe ID",
+      description: "Reference to Stripe's product catalog",
+      readOnly: true,
+      hideFromCollection: true
+    }
+  },
+  
+  // Implementing onPreSave hook
+  callbacks: {
+    onPreSave: async ({ values }) => {
+      if (values.main_image) {
+        const storage = getStorage();
+        const imageRef = ref(storage, values.main_image);
+        try {
+          const url = await getDownloadURL(imageRef);
+          values.main_image_url = url; // Set the download URL in the read-only field
+        } catch (error) {
+          console.error("Error generating download URL:", error);
         }
       }
-    
-      return {
-        dataType: "map",
-        name: "Additional Checkout Fields",
-        properties: properties,
-      };
+      return values;
     }
-    
-  },
-  Actions: [AdminActions] 
-
+  }
 });
-
