@@ -38,16 +38,14 @@ export const LoggerDashboardView = () => {
     const fetchLogs = async () => {
         try {
             setLoading(true);
-            const response = await axios.get(LOG_ENDPOINT, {
-                headers: {
-                    'Content-Type': 'application/json'
-                }
+            const response = await axios.get(`${LOG_ENDPOINT}`, {
+                headers: { "Content-Type": "application/json" }
             });
 
-            const logsData = response.data;
+            // ✅ Ensure logsData is an array
+            const logsData = Array.isArray(response.data) ? response.data : [];
             setLogs(logsData);
-            filterAndSortLogs(logsData, searchQuery, sortOrder);  // Filter and sort logs
-            setLoading(false);
+            filterAndSortLogs(logsData, searchQuery, sortOrder);
         } catch (error: any) {
             console.error("Axios Config:", error.config);
             console.error("Response Data:", error.response?.data || error.message);
@@ -55,13 +53,16 @@ export const LoggerDashboardView = () => {
                 type: "error",
                 message: error.response?.data?.message || "Error fetching logs"
             });
+            setLogs([]); // fallback to empty
+            setFilteredLogs([]);
+        } finally {
             setLoading(false);
         }
     };
 
     // Sort logs by date
     const sortLogs = (logs: LogEntry[], order: 'newest' | 'oldest') => {
-        return logs.sort((a, b) => {
+        return [...logs].sort((a, b) => {
             const dateA = new Date(a.timestamp).getTime();
             const dateB = new Date(b.timestamp).getTime();
             return order === 'newest' ? dateB - dateA : dateA - dateB;
@@ -72,21 +73,25 @@ export const LoggerDashboardView = () => {
     const toggleSortOrder = () => {
         const newOrder = sortOrder === 'newest' ? 'oldest' : 'newest';
         setSortOrder(newOrder);
-        filterAndSortLogs(logs, searchQuery, newOrder);  // Filter and sort logs when toggling sort order
+        filterAndSortLogs(logs, searchQuery, newOrder);
     };
 
     // Handle search query changes
     const handleSearch = (event: React.ChangeEvent<HTMLInputElement>) => {
         const query = event.target.value.toLowerCase();
         setSearchQuery(query);
-        filterAndSortLogs(logs, query, sortOrder);  // Filter and sort logs when searching
+        filterAndSortLogs(logs, query, sortOrder);
     };
 
     // Filter and sort logs based on search query and sort order
     const filterAndSortLogs = (logs: LogEntry[], query: string, order: 'newest' | 'oldest') => {
+        if (!Array.isArray(logs)) {
+            setFilteredLogs([]);
+            return;
+        }
         const filtered = logs.filter((log) =>
-            log.message.toLowerCase().includes(query) ||
-            log.type.toLowerCase().includes(query)
+            log.message?.toLowerCase().includes(query) ||
+            log.type?.toLowerCase().includes(query)
         );
         const sortedFilteredLogs = sortLogs(filtered, order);
         setFilteredLogs(sortedFilteredLogs);
@@ -117,10 +122,7 @@ export const LoggerDashboardView = () => {
 
                 {/* Sort Order Toggle Button */}
                 <Grid item>
-                    <Button
-                        variant="outlined"
-                        onClick={toggleSortOrder}
-                    >
+                    <Button variant="outlined" onClick={toggleSortOrder}>
                         Sorted by {sortOrder === 'newest' ? 'Newest' : 'Oldest'}
                     </Button>
                 </Grid>
@@ -159,10 +161,10 @@ export const LoggerDashboardView = () => {
                                                     {new Date(log.timestamp).toLocaleString()}
                                                 </Typography>
                                                 <Typography variant="h6">
-                                                    {log.type.toUpperCase()} - {log.message}
+                                                    {log.type?.toUpperCase()} - {log.message}
                                                 </Typography>
                                                 <Typography variant="caption">
-                                                    Process ID: {log.process_id}, App: {log.app_name}
+                                                    Process ID: {log.process_id}, App: {log.app_name ?? "N/A"}
                                                 </Typography>
                                             </CardContent>
                                         </Card>
@@ -181,12 +183,13 @@ export const LoggerDashboardView = () => {
 
 // Helper function to get color based on log type
 const getLogTypeColor = (type: string): string => {
+    if (!type) return "blue";
     switch (type.toLowerCase()) {
-        case 'err':
-            return 'red';
-        case 'out':
-            return 'lightgray';
+        case "err":
+            return "red";
+        case "out":
+            return "lightgray";
         default:
-            return 'blue'; // Default color for unknown types
+            return "blue"; // Default color for unknown types
     }
 };

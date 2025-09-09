@@ -1,44 +1,97 @@
 import {
     buildCollection,
-  } from "firecms";
+    buildProperty,
+    EntityCallbacks,
+    EntityOnSaveProps
+} from "firecms";
+import { doc, getDoc, getFirestore } from "firebase/firestore";
+import { initializeApp } from "firebase/app";
+import { dbConfig } from "../utils/firebase.utils";
 
-const CustomView = (entity: any, modifiedValues: any) => {
+const firebaseApp = initializeApp(dbConfig);
+const db = getFirestore(firebaseApp);
 
-    return(
-        <div>Custom View</div>
-    )
+function slugify(text: string): string {
+    return text
+        .toString()
+        .toLowerCase()
+        .trim()
+        .replace(/\s+/g, "-")
+        .replace(/[^\w\-]+/g, "")
+        .replace(/\-\-+/g, "-");
 }
-
 
 export const grabbsCollection = buildCollection({
     name: "Grabbs",
-    icon: 'Sell',
+    path: "grabb_q",
     singularName: "Grabb",
-    path: "grabbs",
+    icon: "Sell",
     properties: {
-        createdAt: {
-            name: 'Created',
-            dataType: 'date',
-            autoValue: "on_create"
-        },
-        slug: {
+        slug: buildProperty({
             name: "Slug",
             dataType: "string",
-            validation: {
-                required: true,
-                lowercase: true,
-                unique: true,
-            },
-        },
+            readOnly: true,
+            hideFromCollection: true,
+            description: "Automatically generated slug"
+        }),
         product: {
             dataType: "reference",
-            name: "Product",
-            description: "Reference to product for this Grabb",
+            name: "Queued Product",
+            description: "Reference to a product",
             path: "products",
-            validation: {
-                required: true,
-            },
+            previewProperties: ["main_image", "name"]
         },
+        createdAt: {
+            name: "Created",
+            dataType: "date",
+            autoValue: "on_create",
+            hideFromCollection: true
+        },
+        quantity: {
+            dataType: "number",
+            name: "Starting Quantity",
+            readOnly: true,
+            columnWidth: 200
+        },
+        stripe_id: {
+            dataType: "string",
+            name: "Stripe ID",
+            readOnly: true,
+            columnWidth: 200
+        }
     },
-    textSearchEnabled: true
+    textSearchEnabled: true,
+
+    callbacks: {
+        onPreSave: async ({ values }: EntityOnSaveProps<any>) => {
+            if (!values.product?.path) {
+                throw new Error("Queued product must reference a valid product");
+            }
+
+            const prodRefPath = `${values.product.path}/${values.product.id}`;
+            const [collection, docId] = prodRefPath.split("/").filter(Boolean);
+
+            const snap = await getDoc(doc(db, collection, docId));
+
+            if (!snap.exists()) {
+                throw new Error(`No product found at ${collection}/${docId}`);
+            }
+
+            const productName = snap.get("name") ?? values.product.id;
+            const prodQuantity = snap.get("quantity");
+            const stripeID = snap.get("stripe_id");
+
+            if (!stripeID) {
+                throw new Error(
+                    `Product "${productName}" has no Stripe ID — cannot queue Grabb.`
+                );
+            }
+
+            values.slug = slugify(`${productName}-${Date.now()}`);
+            if (prodQuantity !== undefined) values.quantity = prodQuantity;
+            values.stripe_id = stripeID;
+
+            return values; // ✅ Only saved if valid
+        }
+    } as EntityCallbacks<any>
 });

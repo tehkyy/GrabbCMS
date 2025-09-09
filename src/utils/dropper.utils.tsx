@@ -11,6 +11,7 @@ export const triggerDropperProxy = async (method: string) => {
         time: new Date().toISOString(),
     };
 
+    console.log('Endpoint is: ', ENDPOINT)
     console.log('Data being sent:', data);
 
     const dropperConfig: AxiosRequestConfig = {
@@ -21,11 +22,11 @@ export const triggerDropperProxy = async (method: string) => {
             'Content-Type': 'application/json',
             'Authorization': `Bearer ${API_KEY}`,
         },
-        data: { data } // Ensure your server expects this structure
+        data: { data }
     };
-
     try {
-        const response = await axios.request(dropperConfig);  // Correcting the request call
+        const response = await axios.request(dropperConfig);
+        console.log(response)
 
         if (response.status !== 200) {
             throw new Error(`Network response was not ok. Status: ${response.status}. Response: ${response.data}`);

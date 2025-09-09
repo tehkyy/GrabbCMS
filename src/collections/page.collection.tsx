@@ -1,121 +1,89 @@
-import {
-  EntityReference,
-  buildCollection,
-} from "firecms";
+import { buildCollection } from "firecms";
 
-import { GRABBIT_COLOR } from "../utils/colors.utils";
-import AdminActions from "../actions/admin.actions";
-
-
-type Page = {
-  page_slug: string;
-  page_title: string;
-  page_body: string;
-  header_section: {
-    headline: string;
-    subhead: string;
-    body_copy: string;
-    header_image: string;
-    button_text: string;
-  }
-  promo_section: EntityReference;
-  content_blocks: EntityReference[];
-  createdAt: Date;
-};
-
-
-export const pagesCollection = buildCollection<Page>({
+export const pagesCollection = buildCollection({
   name: "Pages",
-  icon: 'Web',
-  singularName: "Page",
   path: "pages",
-  group: 'Content',
-  permissions: ({ authController }) => ({
-    edit: true,
-    create: true,
-    delete: true
-  }),
-
   properties: {
-    createdAt: {
-      name: 'Created',
-      dataType: 'date',
-      autoValue: "on_create"
-    },
     page_slug: {
       name: "Slug",
       dataType: "string",
-      validation: {
-        required: true,
-        lowercase: true,
-        unique: true,
-      },
-
+      validation: { required: true }
     },
     page_title: {
       name: "Title",
-      validation: { required: true },
-      dataType: "string"
-    },
-    page_body: {
-      name: "Body",
-      validation: { required: false },
       dataType: "string",
-      markdown: true,
+      validation: { required: true }
     },
-    header_section: {
+    template: {
+      name: "Template",
+      dataType: "string",
+      enumValues: {
+        default: "Default",
+        howItWorks: "How It Works",
+        faq: "FAQ",
+        contact: "Contact"
+      }
+    },
+    seo: {
+      name: "SEO",
       dataType: "map",
       properties: {
-        headline: {
-          name: "Headline",
-          validation: { required: false },
+        title: { 
+          name: "Meta Title",
           dataType: "string"
         },
-        subhead: {
-          name: "Subhead",
-          validation: { required: false },
+        description: { 
+          name: "Meta Description",
           dataType: "string"
         },
-        body_copy: {
-          name: "Body Copy",
-          validation: { required: false },
-          dataType: "string"
-        },
-        header_image: {
-          name: "Header Image",
-          dataType: "string",
-          validation: {
-            required: false,
-          },
-          storage: {
-            storagePath: "images",
-            acceptedFiles: ["image/*"]
-          }
-        },
-        button_text: {
-          name: "Button Text",
-          validation: { required: false },
-          dataType: "string"
+        keywords: { 
+          name: "Keywords",
+          dataType: "array", of: { dataType: "string" } 
         }
       }
     },
-    promo_section: {
-      dataType: "reference",
-      name: "Promo",
-      description: "Reference to a promotion",
-      path: "promotions"
+    navigation: {
+      name: "Navigation",
+      dataType: "map",
+      properties: {
+        includeInMenu: { 
+          name: "Include In Menu?",
+          dataType: "boolean"
+         },
+        menuLabel: { 
+          name: "Label",
+          dataType: "string" 
+        },
+        order: { 
+          name: "Order In Menu",
+          dataType: "number" 
+        }
+      }
     },
     content_blocks: {
       name: "Content Blocks",
       dataType: "array",
       of: {
-        dataType: "reference",
-        path: 'content'
-      },
-      description: "Additional content blocks",
-      validation: { required: false },
+        dataType: "map",
+        properties: {
+          type: {
+            dataType: "string",
+            enumValues: {
+              hero: "Hero",
+              text: "Text",
+              image: "Image",
+              cta: "Call to Action",
+              faq: "FAQ"
+            }
+          },
+          content: {
+            dataType: "map",
+            properties: {
+              // Define properties based on the 'type' selected
+            }
+          }
+        }
+      }
     }
-  },
-
-
+  }
 });

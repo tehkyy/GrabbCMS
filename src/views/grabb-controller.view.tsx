@@ -1,4 +1,4 @@
-import { ChangeEvent, useEffect, useState } from "react";
+import { ChangeEvent } from "react";
 import {
     Box,
     Button,
@@ -13,52 +13,23 @@ import {
 } from "@mui/material";
 
 import {
-    buildCollection,
     Entity,
     EntityCollectionView,
     useAuthController,
     useReferenceDialog,
     useSelectionController,
     useSideEntityController,
-    useSnackbarController
+    useSnackbarController,
+    useCollectionFetch
 } from "firecms";
 
 import { Product } from "../types/product.type";
 import { triggerDropperProxy } from "../utils/dropper.utils";
 import { setRealtimeData, useRealtimeData } from "../utils/realtime.utils";
-import { Remove, RemoveRedEye, Speed } from "@mui/icons-material";
+import { Remove, RemoveRedEye, Speed, FitnessCenter } from "@mui/icons-material";
 import { AddIcon } from "@firecms/ui";
-
-
-const queueCollection = buildCollection({
-    name: "Queue Products",
-    group: 'Product',
-    icon: 'Queue',
-    singularName: "Queued Product",
-    path: "grabb_q",
-    permissions: ({ authController }) => ({
-        edit: true,
-        create: true,
-        delete: true
-    }),
-
-    properties: {
-        createdAt: {
-            name: 'Created',
-            dataType: 'date',
-            autoValue: "on_create",
-            hideFromCollection: true,
-            readOnly: true,
-        },
-        product: {
-            dataType: "reference",
-            name: "Product Queue",
-            description: "Reference to self",
-            path: "products",
-            previewProperties: ["main_image", "name"]
-        },
-    },
-});
+import { grabbsCollection } from "../collections/grabbs.collection";
+import { Switch, FormControlLabel } from "@mui/material";
 
 /**
  * Sample CMS view not bound to a collection, customizable by the developer
@@ -92,6 +63,29 @@ export function GrabbControllerView() {
     const currentInventory = useRealtimeData({ collectionName: 'currentsale', documentName: 'product/quantity' })
     const grabbActive = useRealtimeData({ collectionName: 'currentsale', documentName: 'active' })
     const currentSpeed = useRealtimeData({ collectionName: 'currentsale', documentName: 'speed' })
+    const effectiveSpeed = useRealtimeData({ collectionName: 'currentsale', documentName: 'effectiveSpeed' })
+    const viewerWeight = useRealtimeData({ collectionName: 'currentsale', documentName: 'speedFactors/viewerWeight' })
+    const priceWeight = useRealtimeData({ collectionName: 'currentsale', documentName: 'speedFactors/priceWeight' })
+
+
+    const { data: queue } = useCollectionFetch({
+        path: "grabb_q",
+        collection: grabbsCollection
+    });
+
+    // true if queue is empty
+    const queueIsEmpty = !queue || queue.length === 0;
+
+    // true if ANY queued item has no stripe_id
+    const hasInvalidItems = queue?.some((item: any) => !item.values?.stripe_id) ?? false;
+
+    // final disable condition
+    const disableStartGrabb = queueIsEmpty || hasInvalidItems;
+
+    const ignoreWeights = useRealtimeData({
+        collectionName: "currentsale",
+        documentName: "speedFactors/ignoreWeights"
+    });
 
     const StartGrabb = async () => {
         const response = await triggerDropperProxy('start');
@@ -147,41 +141,41 @@ export function GrabbControllerView() {
         }
     };
 
-    function handleSliderChange(event: Event, value: number | number[]): void {
-        const numberValue = Array.isArray(value) ? value[0] : value;
-        setRealtimeData({ collectionName: 'currentsale', documentName: 'bonusviewers', value: numberValue });
+    // function handleSliderChange(event: Event, value: number | number[]): void {
+    //     const numberValue = Array.isArray(value) ? value[0] : value;
+    //     setRealtimeData({ collectionName: 'currentsale', documentName: 'bonusviewers', value: numberValue });
+    // }
+
+    function handleInputChange(documentPath: string) {
+        return (event: React.ChangeEvent<HTMLInputElement>) => {
+            const value = Number(event.target.value);
+            setRealtimeData({
+                collectionName: "currentsale",
+                documentName: documentPath,
+                value,
+            });
+        };
     }
 
-    function handleInputChange(event: ChangeEvent<HTMLInputElement>): void {
-        const value = Number(event.target.value);
-        setRealtimeData({ collectionName: 'currentsale', documentName: 'bonusviewers', value: value });
-    }
 
     function handleViewerChange(value: Number): void {
         const newValue = bonusViewers + Number(value)
         setRealtimeData({ collectionName: 'currentsale', documentName: 'bonusviewers', value: newValue });
     }
 
-    function handleSpeedChange(value: Number): void{
-        const newValue = currentSpeed + value
+    function handleSpeedChange(value: Number): void {
+        const newValue = Math.round((currentSpeed + value) * 100) / 100;
         setRealtimeData({ collectionName: 'currentsale', documentName: 'speed', value: newValue });
     }
 
     function handleSpeedInputChange(event: ChangeEvent<HTMLInputElement>): void {
-        const value = Number(event.target.value);
-        setRealtimeData({ collectionName: 'currentsale', documentName: 'speed', value: value });
+        const centsPerSecond = Number(event.target.value);
+        setRealtimeData({
+            collectionName: 'currentsale',
+            documentName: 'speed',
+            value: centsPerSecond
+        });
     }
-
-    function remapSpeed(speed: number): number {
-        const inMin = 0.1;
-        const inMax = 1;
-        const outMin = 1;
-        const outMax = 0.1;
-        const remappedSpeed = (speed - inMin) * (outMax - outMin) / (inMax - inMin) + outMin;
-
-        return remappedSpeed
-    }
-
 
     return (
         <Box
@@ -195,12 +189,8 @@ export function GrabbControllerView() {
                 alignItems={"center"}
                 justifyItems={"center"}>
 
-                <Container maxWidth={"md"}
-                    sx={{
-                        my: 4
-                    }}>
-
-                    <Grid item xs={12}>
+                <Container maxWidth={"lg"} sx={{ my: 4 }}>
+                    <Grid item xs={12} sx={{ my: 4 }}>
                         <Typography variant={"h4"}> Grabb Control Center</Typography>
                     </Grid>
 
@@ -278,14 +268,30 @@ export function GrabbControllerView() {
                                                 </Grid>
                                             </Grid>
                                             :
-                                            <Grid container rowSpacing={5} columnSpacing={2}>
+                                            <Grid container justifyContent={"center"} alignItems={"center"} flexDirection={"column"}>
                                                 <Grid item>
                                                     <Button
+                                                        disabled={disableStartGrabb}
                                                         onClick={() => StartGrabb()}
                                                         color="success"
-                                                        variant="contained">
+                                                        variant="contained"
+                                                    >
                                                         Start Grabb
                                                     </Button>
+
+                                                    {hasInvalidItems && (
+                                                        <Typography variant="caption" color="error">
+                                                            ⚠️ Some queued products are missing Stripe IDs
+                                                        </Typography>
+                                                    )}
+
+                                                </Grid>
+                                                <Grid item>
+                                                    <Typography variant="caption" color={queueIsEmpty ? "error" : "textSecondary"}>
+                                                        {queueIsEmpty
+                                                            ? "Queue is empty"
+                                                            : `Queue length: ${queue.length}`}
+                                                    </Typography>
                                                 </Grid>
                                             </Grid>
 
@@ -295,108 +301,172 @@ export function GrabbControllerView() {
                             </Card>
                         </Grid>
 
-                        <Grid item xs={12} sm={4}>
-                            <Card variant="outlined" sx={{
-                                height: "100%",
-                                display: "flex",
-                                flexDirection: "column"
-                            }}>
-                                <CardContent sx={{ flexGrow: 1 }}>
-                                    <Typography id="input-slider" gutterBottom>Dropp Speed</Typography>
-                                    <Typography variant="caption" gutterBottom>This is the time between updates, a smaller number (i.e. 0.2) means a faster speed.</Typography>
-                                </CardContent>
+                        {/* --- Controls Row: Speed, Weights, Bonus --- */}
+                        <Grid container spacing={2} sx={{ mt: 2 }}>
+                            {/* Dropp Speed */}
+                            <Grid item xs={12} md={4}>
+                                <Card variant="outlined" sx={{ height: "100%", display: "flex", flexDirection: "column" }}>
+                                    <CardContent>
+                                        <Box display="flex" alignItems="center" mb={1}>
+                                            <Speed fontSize="small" sx={{ mr: 1 }} />
+                                            <Typography variant="h6">Dropp Speed</Typography>
+                                        </Box>
+                                        <Typography variant="caption" color="text.secondary">
+                                            Rate of drop in ¢ per second
+                                        </Typography>
+                                    </CardContent>
+                                    <CardActions sx={{ flexDirection: "column", alignItems: "stretch", px: 2, pb: 2 }}>
+                                        {/* Base Speed */}
+                                        <Typography variant="subtitle2" gutterBottom>
+                                            Base Dropp Speed
+                                        </Typography>
+                                        <Box display="flex" alignItems="center" justifyContent="center" mb={1}>
+                                            <Button size="small" onClick={() => handleSpeedChange(-0.1)}>
+                                                <Remove />
+                                            </Button>
+                                            <Input
+                                                value={currentSpeed ?? 0}
+                                                onChange={handleSpeedInputChange}
+                                                inputProps={{
+                                                    type: "number",
+                                                    min: 0.1,
+                                                    step: 0.1,
+                                                    style: { textAlign: "center", width: 80 }
+                                                }}
+                                            />
+                                            <Button size="small" onClick={() => handleSpeedChange(0.1)}>
+                                                <AddIcon />
+                                            </Button>
+                                        </Box>
 
-                                <CardActions>
-                                    <Grid container spacing={2} alignItems="center">
-                                        <Grid item>
-                                            <Speed />
-                                        </Grid>
-                                        <Grid item>
-                                            <Grid container spacing={2} alignItems="center">
-                                                <Grid item>
-                                                    <Button size="small" color="primary" aria-label="remove" onClick={() => handleSpeedChange(.01)}>
-                                                        <Remove />
-                                                    </Button>
-                                                </Grid>
-                                                <Grid item>
+                                        {/* Effective Speed */}
+                                        <Typography variant="subtitle2">Effective Dropp Speed</Typography>
+                                        <Typography variant="h6" textAlign="center">
+                                            ${((effectiveSpeed ?? 0) / 100).toFixed(3)} / Second
+                                        </Typography>
+                                    </CardActions>
+                                </Card>
+                            </Grid>
 
-                                                    <Input
-                                                        value={currentSpeed ? currentSpeed : 0}
-                                                        onChange={handleSpeedInputChange}
-                                                        inputProps={{
-                                                            step: 1,
-                                                            min: 1,
-                                                            max: 250,
-                                                            type: 'number',
-                                                            'aria-labelledby': 'input-slider',
-                                                        }}
-                                                    />
-                                                </Grid>
-                                                <Grid item>
+                            {/* Speed Weights */}
+                            <Grid item xs={12} md={4}>
+                                <Card variant="outlined" sx={{
+                                    height: "100%",
+                                    display: "flex",
+                                    flexDirection: "column"
+                                }}>
+                                    <CardContent sx={{ flexGrow: 1 }}>
+                                        <Box display="flex" alignItems="center" mb={1}>
+                                            <FitnessCenter fontSize="small" sx={{ mr: 1 }} />
+                                            <Typography variant="h6">Dropp Speed</Typography>
+                                        </Box>
+                                        <Typography variant="caption" color="text.secondary">
+                                            Rate of drop in ¢ per second
+                                        </Typography>
+                                        <FormControlLabel
+                                            control={
+                                                <Switch
+                                                    checked={!!ignoreWeights}
+                                                    onChange={(e) =>
+                                                        setRealtimeData({
+                                                            collectionName: "currentsale",
+                                                            documentName: "speedFactors/ignoreWeights",
+                                                            value: e.target.checked
+                                                        })
+                                                    }
+                                                />
+                                            }
+                                            label="Ignore all weights"
+                                        />
+                                    </CardContent>
 
-                                                    <Button size="small" color="primary" aria-label="add" onClick={() => handleSpeedChange(-.01)}>
-                                                        <AddIcon />
-                                                    </Button>
-                                                </Grid>
+                                    <CardActions>
+                                        <Grid container alignItems="center" spacing={2}>
+                                            <Grid item xs={12}>
+                                                <Input
+                                                    value={viewerWeight ? viewerWeight * 100 : 0}
+                                                    disabled={!!ignoreWeights}   // 👈 disable when toggle is on
+                                                    onChange={(e) => {
+                                                        const percent = Number(e.target.value);
+                                                        const raw = percent / 100;
+                                                        setRealtimeData({
+                                                            collectionName: "currentsale",
+                                                            documentName: "speedFactors/viewerWeight",
+                                                            value: raw
+                                                        });
+                                                    }}
+                                                    inputProps={{
+                                                        step: 0.1,
+                                                        min: 0,
+                                                        max: 100,
+                                                        type: "number",
+                                                        style: { textAlign: "center" }
+                                                    }}
+                                                />
+                                                <Typography variant="caption">Influence per viewer (%)</Typography>
+                                            </Grid>
+
+                                            <Grid item xs={12}>
+                                                <Input
+                                                    value={priceWeight ? priceWeight * 100 : 0}
+                                                    disabled={!!ignoreWeights}   // 👈 disable when toggle is on
+                                                    onChange={(e) => {
+                                                        const percent = Number(e.target.value);
+                                                        const raw = percent / 100;
+                                                        setRealtimeData({
+                                                            collectionName: "currentsale",
+                                                            documentName: "speedFactors/priceWeight",
+                                                            value: raw
+                                                        });
+                                                    }}
+                                                    inputProps={{
+                                                        step: 0.1,
+                                                        min: 0,
+                                                        max: 500,
+                                                        type: "number",
+                                                        style: { textAlign: "center" }
+                                                    }}
+                                                />
+                                                <Typography variant="caption">Influence from price ratio (%)</Typography>
                                             </Grid>
                                         </Grid>
+                                    </CardActions>
+                                </Card>
+                            </Grid>
 
-                                    </Grid>
-                                </CardActions>
-                            </Card>
+                            {/* Bonus Viewers */}
+                            <Grid item xs={12} md={4}>
+                                <Card variant="outlined" sx={{ height: "100%", display: "flex", flexDirection: "column" }}>
+                                    <CardContent>
+                                        <Box display="flex" alignItems="center" mb={1}>
+                                            <RemoveRedEye fontSize="small" sx={{ mr: 1 }} />
+                                            <Typography variant="h6">Bonus Viewers</Typography>
+                                        </Box>
+                                        <Typography variant="caption" color="text.secondary">
+                                            Extra viewers
+                                        </Typography>
+                                    </CardContent>
+                                    <CardActions sx={{ height: "100%", alignContent: "center", justifyContent: "center", pb: 2 }}>
+                                        <Button size="small" onClick={() => handleViewerChange(-1)}>
+                                            <Remove />
+                                        </Button>
+                                        <Input
+                                            value={bonusViewers ?? 0}
+                                            onChange={handleInputChange("bonusviewers")}
+                                            inputProps={{
+                                                type: "number",
+                                                min: 0,
+                                                style: { textAlign: "center", width: 80 }
+                                            }}
+                                        />
+                                        <Button size="small" onClick={() => handleViewerChange(1)}>
+                                            <AddIcon />
+                                        </Button>
+                                    </CardActions>
+                                </Card>
+                            </Grid>
                         </Grid>
 
-                        <Grid item xs={12} sm={4}>
-                            <Card variant="outlined" sx={{
-                                height: "100%",
-                                display: "flex",
-                                flexDirection: "column"
-                            }}>
-                                <CardContent sx={{ flexGrow: 1 }}>
-                                    <Typography id="input-slider" gutterBottom>
-                                        Bonus Viewers
-                                    </Typography>
-                                </CardContent>
-
-                                <CardActions>
-                                    <Grid container spacing={2} alignItems="center">
-                                        <Grid item>
-                                            <RemoveRedEye />
-                                        </Grid>
-                                        <Grid item>
-                                            <Grid container spacing={2} alignItems="center">
-                                                <Grid item>
-                                                    <Button size="small" color="primary" aria-label="remove" onClick={() => handleViewerChange(-1)}>
-                                                        <Remove />
-                                                    </Button>
-                                                </Grid>
-                                                <Grid item>
-
-                                                    <Input
-                                                        value={bonusViewers ? bonusViewers : 0}
-                                                        onChange={handleInputChange}
-                                                        inputProps={{
-                                                            step: 1,
-                                                            min: 1,
-                                                            max: 250,
-                                                            type: 'number',
-                                                            'aria-labelledby': 'input-slider',
-                                                        }}
-                                                    />
-                                                </Grid>
-                                                <Grid item>
-
-                                                    <Button size="small" color="primary" aria-label="add" onClick={() => handleViewerChange(1)}>
-                                                        <AddIcon />
-                                                    </Button>
-                                                </Grid>
-                                            </Grid>
-                                        </Grid>
-
-                                    </Grid>
-                                </CardActions>
-                            </Card>
-                        </Grid>
 
                         <Grid item xs={12} sx={{ mt: 3 }}>
                             <Typography>
@@ -414,13 +484,11 @@ export function GrabbControllerView() {
                                 <EntityCollectionView
                                     fullPath={"grabb_q"}
                                     selectionController={selectionController}
-                                    {...queueCollection}
+                                    {...grabbsCollection}
                                 />
                             </Paper>
                         </Grid>
-
                     </Grid>
-
                 </Container>
             </Box>
         </Box>
