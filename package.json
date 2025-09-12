@@ -1,7 +1,7 @@
 {
   "name": "grabbcms",
   "private": true,
-  "version": "1.5.42",
+  "version": "1.5.43",
   "type": "module",
   "scripts": {
     "dev": "vite --mode development",
@@ -24,6 +24,7 @@
     "@mui/material": "^5",
     "@mui/x-date-pickers": "^5.0.0-beta.1",
     "@types/node": "^20.7.1",
+    "algoliasearch": "^5.37.0",
     "axios": "^1.7.2",
     "date-fns": "2.21.1",
     "dotenv": "^16.4.5",
