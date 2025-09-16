@@ -1,11 +1,12 @@
 {
   "name": "grabbcms",
   "private": true,
-  "version": "1.5.43",
+  "version": "1.5.44",
   "type": "module",
   "scripts": {
     "dev": "vite --mode development",
     "loc": "vite --mode loc",
+    "stg": "vite --mode stg",
     "prd": "vite --mode production",
     "build": "tsc && vite build",
     "preview": "vite preview",
