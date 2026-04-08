@@ -1,21 +1,15 @@
-import { ChangeEvent } from "react";
+import { ChangeEvent, useEffect, useState } from "react";
 import {
     Box,
-    Button,
-    Card,
-    CardActions,
-    CardContent,
     Container,
     Grid,
-    Input,
-    Paper,
     Typography
 } from "@mui/material";
 
 import {
     Entity,
-    EntityCollectionView,
     useAuthController,
+    useDataSource,
     useReferenceDialog,
     useSelectionController,
     useSideEntityController,
@@ -26,142 +20,163 @@ import {
 import { Product } from "../types/product.type";
 import { triggerDropperProxy } from "../utils/dropper.utils";
 import { setRealtimeData, useRealtimeData } from "../utils/realtime.utils";
-import { Remove, RemoveRedEye, Speed, FitnessCenter } from "@mui/icons-material";
-import { AddIcon } from "@firecms/ui";
 import { grabbsCollection } from "../collections/grabbs.collection";
-import { Switch, FormControlLabel } from "@mui/material";
+import { GrabbControlCards } from "../cards/GrabbControlCards";
+import { GrabbDashboardCards } from "../cards/GrabbDashboardCards";
+import { GrabbQueue } from "../cards/GrabbQueue";
 
-/**
- * Sample CMS view not bound to a collection, customizable by the developer
- * @constructor
- */
 export function GrabbControllerView() {
-    // hook to display custom snackbars
     const snackbarController = useSnackbarController();
-
     const selectionController = useSelectionController();
-
-    // hook to open the side dialog that shows the entity forms
     const sideEntityController = useSideEntityController();
-
-    // hook to do operations related to authentication
     const authController = useAuthController();
+    const dataSource = useDataSource();
 
-    // hook to open a reference dialog
     const referenceDialog = useReferenceDialog({
         path: "products",
         onSingleEntitySelected(entity: Entity<Product> | null) {
             snackbarController.open({
                 type: "success",
                 message: "Selected " + entity?.values.name
-            })
+            });
         }
     });
-    const activeProduct = useRealtimeData({ collectionName: 'currentsale', documentName: 'product' })
-    const bonusViewers = useRealtimeData({ collectionName: 'currentsale', documentName: 'bonusviewers' })
-    const currentPrice = useRealtimeData({ collectionName: 'currentsale', documentName: 'currentprice' })
-    const currentInventory = useRealtimeData({ collectionName: 'currentsale', documentName: 'product/quantity' })
-    const grabbActive = useRealtimeData({ collectionName: 'currentsale', documentName: 'active' })
-    const currentSpeed = useRealtimeData({ collectionName: 'currentsale', documentName: 'speed' })
-    const effectiveSpeed = useRealtimeData({ collectionName: 'currentsale', documentName: 'effectiveSpeed' })
-    const viewerWeight = useRealtimeData({ collectionName: 'currentsale', documentName: 'speedFactors/viewerWeight' })
-    const priceWeight = useRealtimeData({ collectionName: 'currentsale', documentName: 'speedFactors/priceWeight' })
 
+    // ── RTDB subscriptions ──────────────────────────────────────────────────
+    const activeProduct = useRealtimeData({ collectionName: 'currentsale', documentName: 'product' });
+    const bonusViewers = useRealtimeData({ collectionName: 'currentsale', documentName: 'bonusviewers' });
+    const natchyViewers = useRealtimeData({ collectionName: 'currentsale', documentName: 'viewers' });
+    const currentPrice = useRealtimeData({ collectionName: 'currentsale', documentName: 'currentprice' });
+    const currentInventory = useRealtimeData({ collectionName: 'currentsale', documentName: 'product/quantity' });
+    const grabbActive = useRealtimeData({ collectionName: 'currentsale', documentName: 'active' });
+    const currentSpeed = useRealtimeData({ collectionName: 'currentsale', documentName: 'speed' });
+    const effectiveSpeed = useRealtimeData({ collectionName: 'currentsale', documentName: 'effectiveSpeed' });
+    const viewerWeight = useRealtimeData({ collectionName: 'currentsale', documentName: 'speedFactors/viewerWeight' });
+    const priceWeight = useRealtimeData({ collectionName: 'currentsale', documentName: 'speedFactors/priceWeight' });
+    const varianceEnabled = useRealtimeData({ collectionName: "currentsale", documentName: "varianceConfig/enabled" });
+    const varianceTolerance = useRealtimeData({ collectionName: "currentsale", documentName: "varianceConfig/tolerance" });
+    const varianceMode = useRealtimeData({ collectionName: "currentsale", documentName: "varianceConfig/mode" });
+    const weighting = useRealtimeData({ collectionName: "currentsale", documentName: "speedFactors/weigthing" });
 
+    const naturalCount = natchyViewers ? Object.keys(natchyViewers).length - 1 : 1;
+
+    // ── Queue ───────────────────────────────────────────────────────────────
     const { data: queue } = useCollectionFetch({
         path: "grabb_q",
-        collection: grabbsCollection
+        collection: grabbsCollection,
     });
 
-    // true if queue is empty
     const queueIsEmpty = !queue || queue.length === 0;
-
-    // true if ANY queued item has no stripe_id
     const hasInvalidItems = queue?.some((item: any) => !item.values?.stripe_id) ?? false;
-
-    // final disable condition
     const disableStartGrabb = queueIsEmpty || hasInvalidItems;
 
-    const ignoreWeights = useRealtimeData({
-        collectionName: "currentsale",
-        documentName: "speedFactors/ignoreWeights"
-    });
+    // ── Product name resolution ─────────────────────────────────────────────
+    const [productNames, setProductNames] = useState<Record<string, string>>({});
+
+    useEffect(() => {
+        if (!queue || queue.length === 0) return;
+
+        const unresolvedIds = queue
+            .map((item: any) => item.values?.product?.id)
+            .filter((id: string) => id && !productNames[id]);
+
+        if (unresolvedIds.length === 0) return;
+
+        const resolve = async () => {
+            const entries = await Promise.all(
+                unresolvedIds.map(async (id: string) => {
+                    try {
+                        const entity = await dataSource.fetchEntity({
+                            path: "products",
+                            entityId: id,
+                            collection: { properties: {} } as any,
+                        });
+                        return [id, (entity?.values as any)?.name ?? id];
+                    } catch {
+                        return [id, id];
+                    }
+                })
+            );
+            setProductNames(prev => ({ ...prev, ...Object.fromEntries(entries) }));
+        };
+
+        resolve();
+    }, [queue]);
+
+    // ── SSE dropper status ──────────────────────────────────────────────────
+    const [dropperStatus, setDropperStatus] = useState<any>(null);
+
+    useEffect(() => {
+        const source = new EventSource(import.meta.env.VITE_DROPSERVER + "/status/stream", {
+            withCredentials: false
+        });
+        source.onmessage = (event) => {
+            const data = JSON.parse(event.data);
+            setDropperStatus({ error: false, data });
+        };
+        source.onerror = (err) => {
+            console.error("SSE error:", err);
+            setDropperStatus({ error: true, message: "SSE connection lost" });
+        };
+        return () => source.close();
+    }, []);
+
+    // ── Actions ─────────────────────────────────────────────────────────────
 
     const StartGrabb = async () => {
         const response = await triggerDropperProxy('start');
-        console.log(response);
-
         if (response.statusCode === 200) {
-            snackbarController.open({
-                type: "success",
-                message: 'Grabb has started!'
-            });
-        }
-        else {
-            snackbarController.open({
-                type: "error",
-                message: `Error! ${response.body}`
-            });
+            snackbarController.open({ type: "success", message: 'Grabb has started!' });
+        } else {
+            snackbarController.open({ type: "error", message: `Error! ${response.body}` });
         }
     };
 
     const StopGrabb = async () => {
-        const response = await triggerDropperProxy('stop');
-        console.log(response);
-
-        if (response.statusCode === 200) {
-            snackbarController.open({
-                type: "success",
-                message: 'Grabb was stopped.'
-            });
+        try {
+            const response = await triggerDropperProxy('stop');
+            if (response.statusCode === 200) {
+                snackbarController.open({ type: "success", message: 'Grabb was stopped.' });
+                return;
+            }
+            const body = JSON.parse(response.body ?? '{}');
+            const isStateError =
+                (typeof body?.error === 'string' && body.error.includes('Invalid transition')) ||
+                (typeof body?.message === 'string' && body.message.includes('Invalid transition'));
+            if (isStateError) { await escalateToForceStop(); return; }
+            snackbarController.open({ type: "error", message: `Error! ${response.body}` });
+        } catch (error: any) {
+            const serverError = error?.response?.data?.error ?? error?.message ?? 'Unknown error';
+            if (typeof serverError === 'string' && serverError.includes('Invalid transition')) {
+                await escalateToForceStop();
+                return;
+            }
+            snackbarController.open({ type: "error", message: `Error! ${String(serverError)}` });
         }
-        else {
-            snackbarController.open({
-                type: "error",
-                message: `Error! ${response.body}`
-            });
+    };
+
+    const escalateToForceStop = async () => {
+        try {
+            console.warn('Escalating to force-stop');
+            const forceResponse = await triggerDropperProxy('force-stop');
+            if (forceResponse.statusCode === 200) {
+                snackbarController.open({ type: "warning", message: 'Server was force reset to stopped state.' });
+            } else {
+                snackbarController.open({ type: "error", message: 'Force stop also failed. Check server logs.' });
+            }
+        } catch {
+            snackbarController.open({ type: "error", message: 'Force stop also failed. Check server logs.' });
         }
     };
 
     const TriggerEndpoint = async (method: string) => {
         const response = await triggerDropperProxy(method);
-        console.log(response);
-
         if (response.statusCode === 200) {
-            snackbarController.open({
-                type: "success",
-                message: response.body
-            });
-        }
-        else {
-            snackbarController.open({
-                type: "error",
-                message: `Error! ${response.body}`
-            });
+            snackbarController.open({ type: "success", message: response.body });
+        } else {
+            snackbarController.open({ type: "error", message: `Error! ${response.body}` });
         }
     };
-
-    // function handleSliderChange(event: Event, value: number | number[]): void {
-    //     const numberValue = Array.isArray(value) ? value[0] : value;
-    //     setRealtimeData({ collectionName: 'currentsale', documentName: 'bonusviewers', value: numberValue });
-    // }
-
-    function handleInputChange(documentPath: string) {
-        return (event: React.ChangeEvent<HTMLInputElement>) => {
-            const value = Number(event.target.value);
-            setRealtimeData({
-                collectionName: "currentsale",
-                documentName: documentPath,
-                value,
-            });
-        };
-    }
-
-
-    function handleViewerChange(value: Number): void {
-        const newValue = bonusViewers + Number(value)
-        setRealtimeData({ collectionName: 'currentsale', documentName: 'bonusviewers', value: newValue });
-    }
 
     function handleSpeedChange(value: Number): void {
         const newValue = Math.round((currentSpeed + value) * 100) / 100;
@@ -169,326 +184,119 @@ export function GrabbControllerView() {
     }
 
     function handleSpeedInputChange(event: ChangeEvent<HTMLInputElement>): void {
-        const centsPerSecond = Number(event.target.value);
-        setRealtimeData({
-            collectionName: 'currentsale',
-            documentName: 'speed',
-            value: centsPerSecond
-        });
+        setRealtimeData({ collectionName: 'currentsale', documentName: 'speed', value: Number(event.target.value) });
     }
 
+    // ── Queue handlers ───────────────────────────────────────────────────────
+
+    const handleOpenEntry = (id: string) => {
+        sideEntityController.open({
+            path: "grabb_q",
+            entityId: id,
+            collection: grabbsCollection,
+        });
+    };
+
+    const handleDeleteEntry = async (id: string) => {
+        try {
+            // Get quantity and product ref from local queue state — no extra fetch needed
+            const entry = (queue ?? []).find((item: any) => item.id === id);
+            const quantity = entry?.values?.quantity ?? 0;
+            const productId = entry?.values?.product?.id;
+
+            // Release quantityQueued on the product doc before deleting
+            if (productId && quantity > 0) {
+                const currentProduct = await dataSource.fetchEntity({
+                    path: "products",
+                    entityId: productId,
+                    collection: { properties: {} } as any,
+                });
+                const currentQueued = (currentProduct?.values as any)?.quantityQueued ?? 0;
+                const newQueued = Math.max(0, currentQueued - quantity);
+
+                await dataSource.saveEntity({
+                    path: "products",
+                    entityId: productId,
+                    values: { ...(currentProduct?.values as any), quantityQueued: newQueued },
+                    collection: { properties: {} } as any,
+                    status: "existing",
+                });
+            }
+
+            // Now delete the queue entry
+            await dataSource.deleteEntity({
+                entity: { id, path: "grabb_q", values: {} as any }
+            });
+
+            snackbarController.open({ type: "success", message: "Queue entry removed." });
+        } catch (error: any) {
+            snackbarController.open({ type: "error", message: `Failed to remove: ${error?.message ?? "Unknown error"}` });
+        }
+    };
+
+    // ── Render ──────────────────────────────────────────────────────────────
+
     return (
-        <Box
-            display="flex"
-            width={"100%"}
-            height={"100%"}>
+        <Box display="flex" width="100%" height="100%">
+            <Box m="auto" display="flex" flexDirection="column" alignItems="center" justifyItems="center">
+                <Container sx={{ y: 4, px: 4, py: 4 }}>
 
-            <Box m="auto"
-                display="flex"
-                flexDirection={"column"}
-                alignItems={"center"}
-                justifyItems={"center"}>
-
-                <Container maxWidth={"lg"} sx={{ my: 4 }}>
                     <Grid item xs={12} sx={{ my: 4 }}>
-                        <Typography variant={"h4"}> Grabb Control Center</Typography>
+                        <Typography variant="h4">Grabb Control Center</Typography>
                     </Grid>
 
-                    <Grid container rowSpacing={5} columnSpacing={2}>
-                        <Grid item xs={12} sm={4}>
-                            <Card variant="outlined" sx={{ height: "100%", display: 'flex' }}>
-                                <Box
-                                    display="flex"
-                                    flexDirection={"column"}
-                                    alignItems={"center"}
-                                    justifyItems={"center"}
-                                >
-                                    <CardContent sx={{ flex: '1 0 auto' }}>
-                                        <Typography variant={"h5"} >
-                                            Current Price
-                                        </Typography>
-                                        <Typography variant={"h2"} >
-                                            {currentPrice?.toLocaleString("en-US", { style: "currency", currency: "USD" })}
-                                        </Typography>
-                                        <Typography variant={"body1"} >
-                                            Retail price: {activeProduct?.retailPrice.toLocaleString("en-US", { style: "currency", currency: "USD" })}
-                                        </Typography>
-                                    </CardContent>
-                                </Box>
-                            </Card>
-                        </Grid>
-                        <Grid item xs={12} sm={4}>
-                            <Card variant="outlined" sx={{ height: "100%", display: 'flex' }}>
-                                <Box
-                                    display="flex"
-                                    flexDirection={"column"}
-                                    alignItems={"center"}
-                                    justifyItems={"center"}
-                                >
-                                    <CardContent sx={{ flex: '1 0 auto' }}>
-                                        <Typography variant={"h5"} >
-                                            Current Inventory
-                                        </Typography>
-                                        <Typography variant={"h2"} >
-                                            {currentInventory || '🤷🏻‍♂️'}
-                                        </Typography>
-                                    </CardContent>
-                                </Box>
-                            </Card>
-                        </Grid>
-                        <Grid item xs={12} sm={4}>
-                            <Card variant="outlined" sx={{ height: "100%" }}>
-                                <CardContent>
-                                    <Typography variant={"h5"}> Grabb Actions</Typography>
-                                </CardContent>
-                                <CardActions sx={{
-                                    display: "flex",
-                                    flexDirection: "row",
-                                    justifyContent: "center",
-                                    marginBottom: "20px"
-                                }}>
-                                    <Grid>
-                                        {grabbActive ?
-                                            <Grid container rowSpacing={5} columnSpacing={2}>
-                                                <Grid item>
-                                                    <Button
-                                                        onClick={() => StopGrabb()}
-                                                        color="secondary"
-                                                        variant="contained">
-                                                        Stop Grabb
-                                                    </Button>
-                                                </Grid>
-                                                <Grid item>
-                                                    <Button
-                                                        onClick={() => TriggerEndpoint('throw')}
-                                                        color="primary"
-                                                        variant="contained">
-                                                        Trigger Grabb
-                                                    </Button>
-                                                </Grid>
-                                            </Grid>
-                                            :
-                                            <Grid container justifyContent={"center"} alignItems={"center"} flexDirection={"column"}>
-                                                <Grid item>
-                                                    <Button
-                                                        disabled={disableStartGrabb}
-                                                        onClick={() => StartGrabb()}
-                                                        color="success"
-                                                        variant="contained"
-                                                    >
-                                                        Start Grabb
-                                                    </Button>
+                    {/* ── Top control cards ─────────────────────────────── */}
+                    <GrabbControlCards
+                        currentPrice={currentPrice}
+                        activeProduct={activeProduct}
+                        dropperStatus={dropperStatus}
+                        currentInventory={currentInventory}
+                        grabbActive={!!grabbActive}
+                        disableStartGrabb={disableStartGrabb}
+                        hasInvalidItems={hasInvalidItems}
+                        queue={queue ?? []}
+                        queueIsEmpty={queueIsEmpty}
+                        currentSpeed={currentSpeed}
+                        effectiveSpeed={effectiveSpeed}
+                        weighting={!!weighting}
+                        viewerWeight={viewerWeight}
+                        priceWeight={priceWeight}
+                        bonusViewers={bonusViewers ?? 0}
+                        naturalCount={naturalCount}
+                        varianceEnabled={!!varianceEnabled}
+                        varianceTolerance={varianceTolerance}
+                        varianceMode={varianceMode}
+                        onStart={StartGrabb}
+                        onStop={StopGrabb}
+                        onTriggerGrabb={() => TriggerEndpoint('throw')}
+                        onSpeedChange={handleSpeedChange}
+                        onSpeedInputChange={handleSpeedInputChange}
+                        onWeightingChange={(v) => setRealtimeData({ collectionName: "currentsale", documentName: "speedFactors/weigthing", value: v })}
+                        onViewerWeightChange={(e) => setRealtimeData({ collectionName: "currentsale", documentName: "speedFactors/viewerWeight", value: Number(e.target.value) / 100 })}
+                        onPriceWeightChange={(e) => setRealtimeData({ collectionName: "currentsale", documentName: "speedFactors/priceWeight", value: Number(e.target.value) / 100 })}
+                        onVarianceEnabledChange={(v) => setRealtimeData({ collectionName: "currentsale", documentName: "varianceConfig/enabled", value: v })}
+                        onVarianceToleranceChange={(e) => setRealtimeData({ collectionName: "currentsale", documentName: "varianceConfig/tolerance", value: Number(e.target.value) })}
+                        onVarianceModeChange={(v) => setRealtimeData({ collectionName: "currentsale", documentName: "varianceConfig/mode", value: v })}
+                    />
 
-                                                    {hasInvalidItems && (
-                                                        <Typography variant="caption" color="error">
-                                                            ⚠️ Some queued products are missing Stripe IDs
-                                                        </Typography>
-                                                    )}
+                    {/* ── Live analytics cards ───────────────────────────── */}
+                    <GrabbDashboardCards dropperStatus={dropperStatus} />
 
-                                                </Grid>
-                                                <Grid item>
-                                                    <Typography variant="caption" color={queueIsEmpty ? "error" : "textSecondary"}>
-                                                        {queueIsEmpty
-                                                            ? "Queue is empty"
-                                                            : `Queue length: ${queue.length}`}
-                                                    </Typography>
-                                                </Grid>
-                                            </Grid>
-
-                                        }
-                                    </Grid>
-                                </CardActions>
-                            </Card>
-                        </Grid>
-
-                        {/* --- Controls Row: Speed, Weights, Bonus --- */}
-                        <Grid container spacing={2} sx={{ mt: 2 }}>
-                            {/* Dropp Speed */}
-                            <Grid item xs={12} md={4}>
-                                <Card variant="outlined" sx={{ height: "100%", display: "flex", flexDirection: "column" }}>
-                                    <CardContent>
-                                        <Box display="flex" alignItems="center" mb={1}>
-                                            <Speed fontSize="small" sx={{ mr: 1 }} />
-                                            <Typography variant="h6">Dropp Speed</Typography>
-                                        </Box>
-                                        <Typography variant="caption" color="text.secondary">
-                                            Rate of drop in ¢ per second
-                                        </Typography>
-                                    </CardContent>
-                                    <CardActions sx={{ flexDirection: "column", alignItems: "stretch", px: 2, pb: 2 }}>
-                                        {/* Base Speed */}
-                                        <Typography variant="subtitle2" gutterBottom>
-                                            Base Dropp Speed
-                                        </Typography>
-                                        <Box display="flex" alignItems="center" justifyContent="center" mb={1}>
-                                            <Button size="small" onClick={() => handleSpeedChange(-0.1)}>
-                                                <Remove />
-                                            </Button>
-                                            <Input
-                                                value={currentSpeed ?? 0}
-                                                onChange={handleSpeedInputChange}
-                                                inputProps={{
-                                                    type: "number",
-                                                    min: 0.1,
-                                                    step: 0.1,
-                                                    style: { textAlign: "center", width: 80 }
-                                                }}
-                                            />
-                                            <Button size="small" onClick={() => handleSpeedChange(0.1)}>
-                                                <AddIcon />
-                                            </Button>
-                                        </Box>
-
-                                        {/* Effective Speed */}
-                                        <Typography variant="subtitle2">Effective Dropp Speed</Typography>
-                                        <Typography variant="h6" textAlign="center">
-                                            ${((effectiveSpeed ?? 0) / 100).toFixed(3)} / Second
-                                        </Typography>
-                                    </CardActions>
-                                </Card>
-                            </Grid>
-
-                            {/* Speed Weights */}
-                            <Grid item xs={12} md={4}>
-                                <Card variant="outlined" sx={{
-                                    height: "100%",
-                                    display: "flex",
-                                    flexDirection: "column"
-                                }}>
-                                    <CardContent sx={{ flexGrow: 1 }}>
-                                        <Box display="flex" alignItems="center" mb={1}>
-                                            <FitnessCenter fontSize="small" sx={{ mr: 1 }} />
-                                            <Typography variant="h6">Dropp Speed</Typography>
-                                        </Box>
-                                        <Typography variant="caption" color="text.secondary">
-                                            Rate of drop in ¢ per second
-                                        </Typography>
-                                        <FormControlLabel
-                                            control={
-                                                <Switch
-                                                    checked={!!ignoreWeights}
-                                                    onChange={(e) =>
-                                                        setRealtimeData({
-                                                            collectionName: "currentsale",
-                                                            documentName: "speedFactors/ignoreWeights",
-                                                            value: e.target.checked
-                                                        })
-                                                    }
-                                                />
-                                            }
-                                            label="Ignore all weights"
-                                        />
-                                    </CardContent>
-
-                                    <CardActions>
-                                        <Grid container alignItems="center" spacing={2}>
-                                            <Grid item xs={12}>
-                                                <Input
-                                                    value={viewerWeight ? viewerWeight * 100 : 0}
-                                                    disabled={!!ignoreWeights}   // 👈 disable when toggle is on
-                                                    onChange={(e) => {
-                                                        const percent = Number(e.target.value);
-                                                        const raw = percent / 100;
-                                                        setRealtimeData({
-                                                            collectionName: "currentsale",
-                                                            documentName: "speedFactors/viewerWeight",
-                                                            value: raw
-                                                        });
-                                                    }}
-                                                    inputProps={{
-                                                        step: 0.1,
-                                                        min: 0,
-                                                        max: 100,
-                                                        type: "number",
-                                                        style: { textAlign: "center" }
-                                                    }}
-                                                />
-                                                <Typography variant="caption">Influence per viewer (%)</Typography>
-                                            </Grid>
-
-                                            <Grid item xs={12}>
-                                                <Input
-                                                    value={priceWeight ? priceWeight * 100 : 0}
-                                                    disabled={!!ignoreWeights}   // 👈 disable when toggle is on
-                                                    onChange={(e) => {
-                                                        const percent = Number(e.target.value);
-                                                        const raw = percent / 100;
-                                                        setRealtimeData({
-                                                            collectionName: "currentsale",
-                                                            documentName: "speedFactors/priceWeight",
-                                                            value: raw
-                                                        });
-                                                    }}
-                                                    inputProps={{
-                                                        step: 0.1,
-                                                        min: 0,
-                                                        max: 500,
-                                                        type: "number",
-                                                        style: { textAlign: "center" }
-                                                    }}
-                                                />
-                                                <Typography variant="caption">Influence from price ratio (%)</Typography>
-                                            </Grid>
-                                        </Grid>
-                                    </CardActions>
-                                </Card>
-                            </Grid>
-
-                            {/* Bonus Viewers */}
-                            <Grid item xs={12} md={4}>
-                                <Card variant="outlined" sx={{ height: "100%", display: "flex", flexDirection: "column" }}>
-                                    <CardContent>
-                                        <Box display="flex" alignItems="center" mb={1}>
-                                            <RemoveRedEye fontSize="small" sx={{ mr: 1 }} />
-                                            <Typography variant="h6">Bonus Viewers</Typography>
-                                        </Box>
-                                        <Typography variant="caption" color="text.secondary">
-                                            Extra viewers
-                                        </Typography>
-                                    </CardContent>
-                                    <CardActions sx={{ height: "100%", alignContent: "center", justifyContent: "center", pb: 2 }}>
-                                        <Button size="small" onClick={() => handleViewerChange(-1)}>
-                                            <Remove />
-                                        </Button>
-                                        <Input
-                                            value={bonusViewers ?? 0}
-                                            onChange={handleInputChange("bonusviewers")}
-                                            inputProps={{
-                                                type: "number",
-                                                min: 0,
-                                                style: { textAlign: "center", width: 80 }
-                                            }}
-                                        />
-                                        <Button size="small" onClick={() => handleViewerChange(1)}>
-                                            <AddIcon />
-                                        </Button>
-                                    </CardActions>
-                                </Card>
-                            </Grid>
-                        </Grid>
-
-
-                        <Grid item xs={12} sx={{ mt: 3 }}>
-                            <Typography>
-                                Current Grabb Queue:
-                            </Typography>
-
-                            <Paper
-                                variant={"outlined"}
-                                sx={{
-                                    // width: 800,
-                                    height: 400,
-                                    overflow: "hidden",
-                                    my: 2
-                                }}>
-                                <EntityCollectionView
-                                    fullPath={"grabb_q"}
-                                    selectionController={selectionController}
-                                    {...grabbsCollection}
-                                />
-                            </Paper>
-                        </Grid>
+                    {/* ── Queue ─────────────────────────────────────────── */}
+                    <Grid item xs={12} sx={{ mt: 4 }}>
+                        <GrabbQueue
+                            queue={queue ?? []}
+                            dropperStatus={dropperStatus}
+                            productNames={productNames}
+                            onAddEntry={() => sideEntityController.open({
+                                path: "grabb_q",
+                                collection: grabbsCollection,
+                            })}
+                            onOpenEntry={handleOpenEntry}
+                            onDeleteEntry={handleDeleteEntry}
+                        />
                     </Grid>
+
                 </Container>
             </Box>
         </Box>

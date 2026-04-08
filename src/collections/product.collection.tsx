@@ -7,6 +7,7 @@ import { getStorage, ref, getDownloadURL } from "firebase/storage";
 
 import { Product } from "../types/product.type";
 import { shippingOptionsCollection } from "./shipping-options.collection";
+import { runsCollection } from "./runs.collection";
 
 const CATEGORIES = {
   electronics: "Electronics",
@@ -40,14 +41,14 @@ export const productsCollection = buildCollection<Product>({
   singularName: "Product",
   path: "products",
   inlineEditing: true,
-  textSearchEnabled: true,
+  // textSearchEnabled: true,
   permissions: ({ authController }) => ({
     edit: true,
     create: true,
     delete: true
   }),
   properties: {
-    createdAt:{
+    createdAt: {
       name: 'Created',
       dataType: 'date',
       autoValue: "on_create"
@@ -57,14 +58,14 @@ export const productsCollection = buildCollection<Product>({
       validation: { required: false },
       dataType: "boolean",
       defaultValue: false,
-    }, 
+    },
     name: {
       name: "Name",
-      validation: { 
+      validation: {
         required: true,
         unique: true,
-    },
-    dataType: "string",
+      },
+      dataType: "string",
     },
     descriptionHeading: {
       name: "Description Heading",
@@ -91,6 +92,7 @@ export const productsCollection = buildCollection<Product>({
       dataType: "string",
       description: "What are all the deets for it?",
       columnWidth: 300,
+      multiline: true,
       markdown: true,
     },
     retailPrice: buildProperty({
@@ -102,16 +104,6 @@ export const productsCollection = buildCollection<Product>({
         max: 100000
       },
       description: "Price with range validation",
-      dataType: "number",
-    }),
-    buyItNowPrice: buildProperty({
-      name: "Buy It Now Price",
-      validation: {
-        required: false,
-        min: 0,
-        max: 100000
-      },
-      description: "But it now price",
       dataType: "number",
     }),
     floorPrice: buildProperty({
@@ -155,7 +147,16 @@ export const productsCollection = buildCollection<Product>({
         min: 0,
         max: 100000
       },
-      description: "Price with range validation",
+      description: "Total quantity of this product in inventory",
+      dataType: "number",
+    },
+    quantityQueued: {
+      name: "Quantity Queued",
+      readOnly: true, // Mark this field as read-only
+      validation: {
+        required: false,
+      },
+      description: "Quantity of this product currently queued in active sales",
       dataType: "number",
     },
     launch_time: buildProperty({
@@ -226,7 +227,7 @@ export const productsCollection = buildCollection<Product>({
         dataType: "string",
         enumValues: CATEGORIES,
       }
-    },  
+    },
     stripe_id: {
       dataType: "string",
       name: "Stripe ID",
@@ -235,7 +236,7 @@ export const productsCollection = buildCollection<Product>({
       hideFromCollection: true
     }
   },
-  
+  subcollections: [runsCollection],
   // Implementing onPreSave hook
   callbacks: {
     onPreSave: async ({ values }) => {

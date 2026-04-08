@@ -10,6 +10,7 @@ interface ImportMetaEnv {
     readonly VITE_MESSAGING: string
     readonly VITE_APP_ID: string
     readonly VITE_MEASUREMENT_ID: string
+    readonly VITE_DROPSERVER: string
     readonly VITE_DROPPER: string
     readonly VITE_FUNCTION_DROPP_KEY: string
     readonly VITE_LOGGER_ENDPOINT: string
